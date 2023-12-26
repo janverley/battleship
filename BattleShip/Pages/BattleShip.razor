@@ -1,0 +1,176 @@
+﻿@page "/"
+@using global::BattleShip.Data
+@inject GameService GameService
+
+<h1>Zeeslag</h1>
+<button @onclick="()=> OnNewGame()">Nieuw Spel</button>
+@if (game.State == GameState.Setup)
+{
+    <h2>Stel je schepen op in het rechter vak</h2>
+    <button @onclick="()=> OnRandom()">Random Spel</button>
+    <button @onclick="()=> currentOrientation = !currentOrientation">@OrientationButtonText()</button>
+    <p>@currentBoatLength</p>
+}
+
+@if (game.State != GameState.Setup)
+{
+    <h2>@game.ShotsFired keer geschoten - Speler: @game.ComputerBoard.Hits() Computer: @game.PlayerBoard.Hits()</h2>
+}
+
+@if (game.State == GameState.Won)
+{
+    <h2 class="h2 won">Jij bent gewonnen! </h2>
+}
+@if (game.State == GameState.Lost)
+{
+    <h2 class="h2 lost">Jij bent verloren! </h2>
+}
+<table class="inlineTable">
+        <thead>
+        <tr>
+        <th class="cell header-cell">/</th>
+        @foreach (var row in game.ComputerBoard.Rows.First().Cells)
+        {
+            <th class="cell header-cell">@(row.Coordinate.X + 1)</th>
+        }
+          </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in game.ComputerBoard.Rows)
+        {
+            <tr>
+                <td class="cell header-cell">@row.IndexText</td>
+                @foreach (var cell in row.Cells)
+                {
+                     <td class=" cell field-cell @CssClassFromHitState(cell)" @onclick="() => ClickedComputerCell(cell)">@GetCellContent(cell)</td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+
+    <table class="inlineTable">
+        <thead>
+        <tr>
+        <th class="cell header-cell">/</th>
+        @foreach (var row in game.PlayerBoard.Rows.First().Cells)
+        {
+            <th class="cell header-cell">@(row.Coordinate.X + 1)</th>
+        }
+          </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in game.PlayerBoard.Rows)
+        {
+            <tr>
+                <td class="cell header-cell">@row.IndexText</td>
+                @foreach (var cell in row.Cells)
+                {
+                     <td class=" cell field-cell @CssClassFromHitState(cell) @CssClassFromLastShot(cell)" @onclick="() => ClickedPlayerCell(cell)">@GetPlayerCellContent(cell)</td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+
+
+
+@functions
+{
+    string OrientationButtonText() => currentOrientation ? "Horizontaal" : "Verticaal";
+
+    static string CssClassFromHitState(Cell cell)
+    {
+        return cell.IsHit ? "hit" 
+            : cell.IsMiss ? "miss" 
+            : "";
+
+    }
+
+    private string CssClassFromLastShot(Cell cell)
+    {
+        return cell.Coordinate == GameService.Shooter.LastShot ? "last-shot" : "";
+    }
+
+    private async Task OnNewGame()
+    {
+        game = await GameService.NewGame();
+        currentBoatLength = 5;
+        currentBoat = 0;
+    }
+
+    private async Task OnRandom()
+    {
+        game = await GameService.Random();
+    }
+}
+
+@code {
+    private Game game;
+
+    protected override async Task OnInitializedAsync()
+    {
+        game = await GameService.NewGame();
+    }
+
+    private static string GetCellContent(Cell cell)
+    {
+        return cell.IsHit ? "X" 
+            : cell.IsMiss ? "0" 
+            : "";
+    }
+
+    private string GetPlayerCellContent(Cell cell)
+    {
+        return cell.IsOccupied ? "X" : " ";
+    }
+    
+    private Task ClickedComputerCell(Cell cell)
+    {
+        if (!computerHasShot)
+        {
+            return Task.CompletedTask;
+        }
+        game = GameService.Shoot(cell.Coordinate);
+        computerHasShot = false;
+        //await Task.Delay(1000);
+        game = GameService.ComputerShoots();
+        computerHasShot = true;
+        return Task.CompletedTask;
+    }
+
+    private bool currentOrientation = false;
+    private int currentBoatLength = 5;
+    private int currentBoat = 0;
+    private bool computerHasShot = true;
+
+    private void ClickedPlayerCell(Cell cell)
+    {
+        game = GameService.Place(cell.Coordinate, currentBoatLength, currentOrientation);
+        NextBoat();
+    }
+
+    private void NextBoat()
+    {
+        switch (currentBoat)
+        {
+            case 0:
+                currentBoatLength = 4;
+                currentBoat = 1;
+                break;
+            case 1:
+                currentBoatLength = 3;
+                currentBoat = 2;
+                break;
+            case 2:
+                currentBoatLength = 3;
+                currentBoat = 3;
+                break;
+            case 3:
+                currentBoatLength = 2;
+                currentBoat = 4;
+                break;
+        }
+    }
+
+}
